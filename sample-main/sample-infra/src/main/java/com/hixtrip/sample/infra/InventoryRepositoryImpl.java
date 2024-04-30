@@ -40,7 +40,7 @@ public class InventoryRepositoryImpl implements InventoryRepository {
         if (sellableQuantity != null) {
             return sellableQuantity;
         }
-        // 缓存管理库存 todo 待确认
+        // 缓存管理库存
         CacheUtil.setCacheMap(cacheKey, Map.of(TOTAL_KEY, DEFAULT_NUM,
                         SELLABLE_KEY, DEFAULT_NUM,
                         WITHHOLDING_KEY, 0,
