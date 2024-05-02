@@ -74,7 +74,7 @@ public class InventoryRepositoryImpl implements InventoryRepository {
             throw new RuntimeException("可售库存不足");
         }
         CacheUtil.incrementMapValue(key, WITHHOLDING_KEY, inventory.getWithholdingQuantity());
-        CacheUtil.incrementMapValue(key, OCCUPIED_KEY, inventory.getWithholdingQuantity());
+        CacheUtil.incrementMapValue(key, OCCUPIED_KEY, inventory.getOccupiedQuantity());
         return 1;
     }
 

@@ -37,6 +37,8 @@ public class OrderController {
     // ENDTIME 秒杀活动结束时间，到秒
     // 活动状态的变更可通过mq或DelayQueue等方式触发
     private static final String SEC_KILL_START_KEY = "HIXTRIP:SEC_KILL:SKUID:";
+    // 活动默认结束间隔
+    private static final Long SEC_KILL_END = 3600L;
 
     // 已秒杀的用户缓存key 格式"HIXTRIP:SEC_KILL:SKUID:111:USERID":{"11":1,"12":1}
     // 判断该活动已下单人员缓存，避免重复下单
@@ -56,7 +58,7 @@ public class OrderController {
     public ResultVO order(@RequestBody /* @Valid */ CommandOderCreateDTO createDTO) {
         //登录信息可以在这里模拟 模拟可能存在单用户多次下单
         Random randomno = new Random();
-        long userId = randomno.nextInt(999);
+        long userId = randomno.nextInt(100000);
         createDTO.setUserId(userId);
         ResultVO result = checkSeckill(createDTO.getSkuId(), createDTO.getUserId());
         if (!result.isSuccess()) {
@@ -90,8 +92,8 @@ public class OrderController {
         }
         DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String endTimeStr = CacheUtil.getCacheMapValue(SEC_KILL_START_KEY + skuId, "ENDTIME");
-        LocalDateTime endTime = LocalDateTime.now().plusHours(1);
         // 临时调整
+        LocalDateTime endTime = LocalDateTime.now().plusSeconds(SEC_KILL_END);
         if(endTimeStr == null || endTimeStr.isBlank()){
             endTimeStr = endTime.format(df);
             CacheUtil.setMapValue(SEC_KILL_START_KEY + skuId, "ENDTIME", endTimeStr);

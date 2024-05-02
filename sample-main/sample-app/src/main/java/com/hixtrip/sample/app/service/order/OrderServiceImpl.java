@@ -12,14 +12,11 @@ import com.hixtrip.sample.domain.inventory.InventoryDomainService;
 import com.hixtrip.sample.domain.order.OrderDomainService;
 import com.hixtrip.sample.domain.order.model.Order;
 import com.hixtrip.sample.domain.pay.model.CommandPay;
-import com.hixtrip.sample.infra.utils.CacheUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Random;
 
 /**
@@ -54,10 +51,17 @@ public class OrderServiceImpl implements OrderService {
             return Boolean.FALSE;
         }
         if (inventoryDomainService.changeInventory(orderVO.getSkuId(), 0L, -orderVO.getNum(), orderVO.getNum())) {
-            CommandPay payOrder = PayConvertor.INSTANCE.dtoToDomain(payDTO);
-            payOrder.setPayStatus(PayStatus.PAY_SUCCESS.getCode());
-            payOrder.setStatus(OrderStatus.WAIT_DELIVER.getCode());
-            return orderDomainService.orderPaySuccess(payOrder);
+            try {
+                CommandPay payOrder = PayConvertor.INSTANCE.dtoToDomain(payDTO);
+                payOrder.setPayStatus(PayStatus.PAY_SUCCESS.getCode());
+                payOrder.setStatus(OrderStatus.WAIT_DELIVER.getCode());
+                return orderDomainService.orderPaySuccess(payOrder);
+            } catch (Exception e) {
+                log.error("更新订单失败，", e);
+                // 库存回滚
+                inventoryDomainService.changeInventory(orderVO.getSkuId(), 0L, orderVO.getNum(), -orderVO.getNum());
+                throw e;
+            }
         }
         log.error("库存扣减失败");
         return Boolean.FALSE;
@@ -92,29 +96,29 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderVO placeOrder(CommandOderCreateDTO orderDTO) {
         Long inventory = inventoryDomainService.getInventory(orderDTO.getSkuId());
-        if(inventory < orderDTO.getNum()){
+        if (inventory < orderDTO.getNum()) {
             throw new RuntimeException("库存不足");
         }
         if (inventoryDomainService.changeInventory(orderDTO.getSkuId(), -orderDTO.getNum(), orderDTO.getNum(), 0L)) {
-            try{
+            try {
                 Order order = OrderConvertor.INSTANCE.toDomain(orderDTO);
                 /**
                  * 根据skuid获取对应商品信息与卖家信息，并填充至order对象,可从缓存获取，
                  * 金额计算并填充至order中，设置第三方支付回调地址，
                  * 订单创建成功后，可发送mq消息用于后续操作，如优惠卷赠送，会员积分等
                  */
-                order.setUserName(order.getUserId()+"name");
-                order.setSellerId((long)(new Random().nextInt(10)));
-                order.setGoodsSku(order.getSkuId()+"setGoodsSku");
-                order.setGoodsTitle(order.getSkuId()+"setGoodsTitle");
-                order.setGoodsSkuPic(order.getSkuId()+"setGoodsSkuPic");
+                order.setUserName(order.getUserId() + "name");
+                order.setSellerId((long) (new Random().nextInt(10)));
+                order.setGoodsSku(order.getSkuId() + "setGoodsSku");
+                order.setGoodsTitle(order.getSkuId() + "setGoodsTitle");
+                order.setGoodsSkuPic(order.getSkuId() + "setGoodsSkuPic");
                 order.setSkuPrice(new BigDecimal(100));
                 order.setTotalAmount(new BigDecimal(100).multiply(new BigDecimal(order.getNum())));
                 order.setUpdateBy(order.getUserId());
                 order.setPayUrl("https://xxx.com/command/order/pay/callback");
                 return OrderConvertor.INSTANCE.toOrderVO(orderDomainService.createOrder(order));
-            }catch (Exception e){
-                log.error("下单失败，",e);
+            } catch (Exception e) {
+                log.error("下单失败，", e);
                 // 库存回滚
                 inventoryDomainService.changeInventory(orderDTO.getSkuId(), orderDTO.getNum(), -orderDTO.getNum(), 0L);
                 throw e;
